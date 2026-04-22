@@ -3,6 +3,7 @@
 namespace Drupal\islandora_microservice_rewrite\EventSubscriber;
 
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Logger\LoggerChannelInterface;
 use Drupal\islandora\Event\GeneratedEventMessageEventInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
@@ -21,10 +22,18 @@ class MicroserviceRewriteSubscriber implements EventSubscriberInterface {
   protected $configFactory;
 
   /**
-   * Constructs the rewrite subscriber scaffold.
+   * The Islandora logger channel.
+   *
+   * @var \Drupal\Core\Logger\LoggerChannelInterface
    */
-  public function __construct(ConfigFactoryInterface $config_factory) {
+  protected $logger;
+
+  /**
+   * Constructs the rewrite subscriber.
+   */
+  public function __construct(ConfigFactoryInterface $config_factory, LoggerChannelInterface $logger) {
     $this->configFactory = $config_factory;
+    $this->logger = $logger;
   }
 
   /**
@@ -63,11 +72,24 @@ class MicroserviceRewriteSubscriber implements EventSubscriberInterface {
 
     foreach (['file_upload_uri', 'source_uri', 'destination_uri'] as $field) {
       if (isset($message['attachment']['content'][$field])) {
-        $message['attachment']['content'][$field] = str_replace(
+        $original = $message['attachment']['content'][$field];
+        $rewritten = str_replace(
           $find,
           $replace,
-          $message['attachment']['content'][$field]
+          $original
         );
+        $message['attachment']['content'][$field] = $rewritten;
+
+        if ($original !== $rewritten) {
+          $this->logger->debug(
+            'Microservice rewrite applied for @field: @original => @rewritten',
+            [
+              '@field' => $field,
+              '@original' => $original,
+              '@rewritten' => $rewritten,
+            ]
+          );
+        }
       }
     }
 
